@@ -28,7 +28,7 @@ export class WhatsAppButtons implements INodeType {
     icon: "file:whatsappbuttons.svg",
     group: ["transform"],
     version: 1,
-    subtitle: "0.1.6",
+    subtitle: "0.1.4",
     description: "Send Message With Buttons",
     defaults: {
       name: "WhatsApp Buttons",
@@ -172,11 +172,12 @@ export class WhatsAppButtons implements INodeType {
         default: {},
         options: [
           {
-            displayName: "Section",
             name: "section",
+            displayName: "Section",
             default: {},
             type: "fixedCollection",
             placeholder: "Add Button",
+            description: "",
             typeOptions: {
               multipleValues: true,
             },
@@ -192,17 +193,19 @@ export class WhatsAppButtons implements INodeType {
                 name: "buttonInSection",
                 placeholder: "Add Button",
                 type: "fixedCollection",
+                description: "",
                 typeOptions: {
                   multipleValues: true,
                 },
                 default: {},
                 options: [
                   {
-                    displayName: "Button",
                     name: "buttons",
+                    displayName: "Button",
                     default: {},
                     type: "fixedCollection",
                     placeholder: "Add Button",
+                    description: "",
                     values: [
                       {
                         displayName: "Title",
