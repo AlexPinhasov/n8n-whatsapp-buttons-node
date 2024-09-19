@@ -3,7 +3,7 @@ import { ICredentialType, INodeProperties } from "n8n-workflow";
 export class WhatsAppButtonsApi implements ICredentialType {
   name = "whatsAppButtonsApi";
   displayName = "WhatsAppButtons API";
-  icon = "file:whatsappbuttons.svg";
+  // icon = "file:whatsappbuttons.svg";
   documentationUrl =
     "https://docs.n8n.io/integrations/creating-nodes/build/declarative-style-node/";
   properties: INodeProperties[] = [
@@ -15,8 +15,8 @@ export class WhatsAppButtonsApi implements ICredentialType {
       default: "",
     },
     {
-      displayName: "Phone Number ID",
-      name: "phoneNumberID",
+      displayName: "Business Account ID",
+      name: "businessAccountID", //"phoneNumberID",
       type: "string",
       typeOptions: { password: false },
       default: "",
