@@ -4,16 +4,20 @@ import type {
   INodeExecutionData,
   INodePropertyOptions,
   INodeType,
-  INodeTypeDescription,
+  INodeTypeDescription
 } from "n8n-workflow";
+import { IExecuteFunctions, NodeApiError } from "n8n-workflow";
 import axios from "axios";
 import {
+  InteractiveButtonData,
+  InteractiveListData,
   Row,
   Section,
-  WhatsAppTemplateBuilder,
+  TemplateData,
+  WhatsAppHeaderComponentType,
+  WhatsAppTemplateBuilder
 } from "./WhatsAppTemplateBuilder";
-import { WhatsAppTemplate } from "./WhatsAppTemplate";
-import { NodeApiError, IExecuteFunctions } from "n8n-workflow";
+import { WhatsAppComponentType, WhatsAppTemplate } from "./WhatsAppTemplate";
 
 export type ParameterArray = Array<{
   parameterValue: string;
@@ -48,20 +52,20 @@ export class WhatsAppButtons implements INodeType {
     displayName: "WhatsApp Buttons",
     name: "whatsAppButtons",
     icon: "file:whatsappbuttons.svg",
-    group: ["transform"],
+    group: [ "transform" ],
     version: 1,
-    subtitle: "0.2.0",
+    subtitle: "1.0.1",
     description: "Send Message With Buttons",
     defaults: {
-      name: "WhatsApp Buttons",
+      name: "WhatsApp Buttons"
     },
-    inputs: ["main"],
-    outputs: ["main"],
+    inputs: [ "main" ],
+    outputs: [ "main" ],
     credentials: [
       {
         name: "whatsAppButtonsApi",
-        required: true,
-      },
+        required: true
+      }
     ],
     properties: [
       {
@@ -71,22 +75,22 @@ export class WhatsAppButtons implements INodeType {
         options: [
           {
             name: "In-Message Buttons",
-            value: "interactive",
+            value: "interactiveButtons"
           },
           {
             name: "List Buttons",
-            value: "listButtons",
+            value: "interactiveList"
           },
           {
             name: "Template",
-            value: "template",
+            value: "template"
           },
           {
             name: "Message",
-            value: "message",
-          },
+            value: "message"
+          }
         ],
-        default: "interactive",
+        default: "interactiveButtons"
       },
       {
         displayName: "List Title",
@@ -96,10 +100,10 @@ export class WhatsAppButtons implements INodeType {
         required: true,
         displayOptions: {
           show: {
-            action: ["listButtons"],
-          },
+            action: [ "interactiveList" ]
+          }
         },
-        description: "Enter the title of the list button",
+        description: "Enter the title of the list button"
       },
       {
         displayName: "Message",
@@ -109,10 +113,10 @@ export class WhatsAppButtons implements INodeType {
         required: true,
         displayOptions: {
           show: {
-            action: ["interactive", "listButtons", "message"],
-          },
+            action: [ "interactiveButtons", "interactiveList", "message" ]
+          }
         },
-        description: "Enter the message to be sent",
+        description: "Enter the message to be sent"
       },
       {
         /* eslint-disable n8n-nodes-base/node-param-description-wrong-for-dynamic-options */
@@ -125,8 +129,8 @@ export class WhatsAppButtons implements INodeType {
         description:
           "The ID of the business account's phone number from which the message will be sent from",
         typeOptions: {
-          loadOptionsMethod: "getPhoneNumbers",
-        },
+          loadOptionsMethod: "getPhoneNumbers"
+        }
       },
       {
         /* eslint-disable n8n-nodes-base/node-param-description-wrong-for-dynamic-options */
@@ -137,20 +141,20 @@ export class WhatsAppButtons implements INodeType {
         placeholder: "Select Template To Send",
         description: "Pull and Select a template to send",
         typeOptions: {
-          loadOptionsMethod: "getTemplates",
+          loadOptionsMethod: "getTemplates"
         },
         displayOptions: {
           show: {
-            action: ["template"],
-          },
-        },
+            action: [ "template" ]
+          }
+        }
       },
       {
         displayName: "Recipient Phone Number",
         name: "phoneNumber",
         type: "string",
         default: "",
-        description: "The number to send to",
+        description: "The number to send to"
       },
       {
         displayName: "Header Type",
@@ -159,14 +163,14 @@ export class WhatsAppButtons implements INodeType {
         options: [
           {
             name: "None",
-            value: "none",
+            value: "none"
           },
           {
             name: "Image",
-            value: "image",
-          },
+            value: "image"
+          }
         ],
-        default: "none",
+        default: "none"
       },
       {
         displayName: "Header Image URL",
@@ -176,10 +180,10 @@ export class WhatsAppButtons implements INodeType {
         default: "",
         displayOptions: {
           show: {
-            headerAction: ["image"],
-          },
+            headerAction: [ "image" ]
+          }
         },
-        description: "Enter the image URL",
+        description: "Enter the image URL"
       },
       {
         displayName: "Max 3 Buttons",
@@ -190,12 +194,12 @@ export class WhatsAppButtons implements INodeType {
           "Field must be defined in the collection, otherwise it will be ignored. If field defined in the collection is not set here, it will be set to null.",
         typeOptions: {
           multipleValues: true,
-          maxValue: 3,
+          maxValue: 3
         },
         displayOptions: {
           show: {
-            action: ["interactive"],
-          },
+            action: [ "interactiveButtons" ]
+          }
         },
         default: {},
         options: [
@@ -207,11 +211,11 @@ export class WhatsAppButtons implements INodeType {
                 displayName: "Button Title",
                 name: "buttonTitle",
                 type: "string",
-                default: "",
-              },
-            ],
-          },
-        ],
+                default: ""
+              }
+            ]
+          }
+        ]
       },
       {
         displayName: "Button List",
@@ -221,12 +225,12 @@ export class WhatsAppButtons implements INodeType {
         description:
           "Field must be defined in the collection, otherwise it will be ignored. If field defined in the collection is not set here, it will be set to null.",
         typeOptions: {
-          multipleValues: true,
+          multipleValues: true
         },
         displayOptions: {
           show: {
-            action: ["listButtons"],
-          },
+            action: [ "interactiveList" ]
+          }
         },
         default: {},
         options: [
@@ -237,14 +241,14 @@ export class WhatsAppButtons implements INodeType {
             type: "fixedCollection",
             placeholder: "Add Button",
             typeOptions: {
-              multipleValues: true,
+              multipleValues: true
             },
             values: [
               {
                 displayName: "Section Title",
                 name: "sectionTitle",
                 type: "string",
-                default: "",
+                default: ""
               },
               {
                 displayName: "Buttons In Section",
@@ -252,7 +256,7 @@ export class WhatsAppButtons implements INodeType {
                 placeholder: "Add Button",
                 type: "fixedCollection",
                 typeOptions: {
-                  multipleValues: true,
+                  multipleValues: true
                 },
                 default: {},
                 options: [
@@ -267,21 +271,21 @@ export class WhatsAppButtons implements INodeType {
                         displayName: "Title",
                         name: "buttonTitle",
                         type: "string",
-                        default: "",
+                        default: ""
                       },
                       {
                         displayName: "Description",
                         name: "buttonDescription",
                         type: "string",
-                        default: "",
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
+                        default: ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       {
         displayName: "Template Parameter List",
@@ -291,12 +295,12 @@ export class WhatsAppButtons implements INodeType {
         description:
           "Each template has a number of parameters shown as {{1}}, for every parameter add a text to replace it with",
         typeOptions: {
-          multipleValues: true,
+          multipleValues: true
         },
         displayOptions: {
           show: {
-            action: ["template"],
-          },
+            action: [ "template" ]
+          }
         },
         default: {},
         options: [
@@ -310,18 +314,18 @@ export class WhatsAppButtons implements INodeType {
                 type: "string",
                 default: "",
                 description:
-                  "Value to replace the template parameter (e.g., {{1}}, {{2}})",
-              },
-            ],
-          },
-        ],
+                  "Value to replace the template parameter (e.g., {{1}}, {{2}})"
+              }
+            ]
+          }
+        ]
       },
       {
         displayName: "Should Use Footer",
         name: "footerToggle",
         type: "boolean",
         default: false,
-        description: "Whether to add a footer message",
+        description: "Whether to add a footer message"
       },
       {
         displayName: "Footer",
@@ -331,9 +335,9 @@ export class WhatsAppButtons implements INodeType {
         description: "Will be presented at the bottom of the message",
         displayOptions: {
           show: {
-            footerToggle: [true],
-          },
-        },
+            footerToggle: [ true ]
+          }
+        }
       },
       {
         displayName: "Should Use Proxy URL",
@@ -341,7 +345,7 @@ export class WhatsAppButtons implements INodeType {
         type: "boolean",
         default: false,
         description:
-          "Whether to add a proxy URL that send the request to it instead of whatsapp servers",
+          "Whether to add a proxy URL that send the request to it instead of whatsapp servers"
       },
       {
         displayName: "Proxy URL",
@@ -352,11 +356,11 @@ export class WhatsAppButtons implements INodeType {
           "Use this proxy to send the message to this URL instead of sending it to WhatsApp servers, meaning by using this value the you will be responsible for delivering the message",
         displayOptions: {
           show: {
-            proxyUrlToggle: [true],
-          },
-        },
-      },
-    ],
+            proxyUrlToggle: [ true ]
+          }
+        }
+      }
+    ]
   };
 
   methods = {
@@ -370,13 +374,13 @@ export class WhatsAppButtons implements INodeType {
 
         // Make the API request to get the available phone numbers
         const response = await axios.get(
-          `${baseURL}/${credentials.businessAccountID}/phone_numbers`,
+          `${ baseURL }/${ credentials.businessAccountID }/phone_numbers`,
           {
             headers: {
-              Authorization: `Bearer ${credentials.apiKey}`,
-              "Content-Type": "application/json",
-            },
-          },
+              Authorization: `Bearer ${ credentials.apiKey }`,
+              "Content-Type": "application/json"
+            }
+          }
         );
 
         // Extract phone numbers from the API response
@@ -386,15 +390,15 @@ export class WhatsAppButtons implements INodeType {
           return [
             {
               name: "No Phone Numbers Available",
-              value: "",
-            },
+              value: ""
+            }
           ];
         }
 
         // Map the phone numbers into a format n8n can display in a dropdown
         return phoneNumbers.map((option) => ({
-          name: `${option.display_phone_number} - ${option.verified_name}`, // This is the label shown in the dropdown
-          value: JSON.stringify(option), // This is the value returned when the user selects an option
+          name: `${ option.display_phone_number } - ${ option.verified_name }`, // This is the label shown in the dropdown
+          value: JSON.stringify(option) // This is the value returned when the user selects an option
         }));
       },
 
@@ -406,13 +410,13 @@ export class WhatsAppButtons implements INodeType {
 
         // Make the API request to get the available phone numbers
         const response = await axios.get(
-          `${baseURL}/${credentials.businessAccountID}/message_templates`,
+          `${ baseURL }/${ credentials.businessAccountID }/message_templates`,
           {
             headers: {
-              Authorization: `Bearer ${credentials.apiKey}`,
-              "Content-Type": "application/json",
-            },
-          },
+              Authorization: `Bearer ${ credentials.apiKey }`,
+              "Content-Type": "application/json"
+            }
+          }
         );
 
         // Extract phone numbers from the API response
@@ -422,18 +426,18 @@ export class WhatsAppButtons implements INodeType {
           return [
             {
               name: "No Templates Available",
-              value: "",
-            },
+              value: ""
+            }
           ];
         }
 
         // Map the phone numbers into a format n8n can display in a dropdown
         return templates.map((option) => ({
           name: option.name,
-          value: JSON.stringify(option),
+          value: JSON.stringify(option)
         }));
-      },
-    },
+      }
+    }
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -441,16 +445,16 @@ export class WhatsAppButtons implements INodeType {
     const phoneNumber = this.getNodeParameter("phoneNumber", 0) as string;
     const whatsappPhoneNumberIdString = this.getNodeParameter(
       "senderPhoneDynamicOption",
-      0,
+      0
     ) as string;
     const whatsappPhoneNumber = JSON.parse(
-      whatsappPhoneNumberIdString,
+      whatsappPhoneNumberIdString
     ) as WhatsAppPhoneNumber;
     const proxyUrl = this.getNodeParameter("proxyUrl", 0, "") as string;
     const proxyUrlToggle = this.getNodeParameter(
       "proxyUrlToggle",
       0,
-      false,
+      false
     ) as boolean;
     const credentials = await this.getCredentials("whatsAppButtonsApi");
     const headerAction = this.getNodeParameter("headerAction", 0) as string;
@@ -458,7 +462,7 @@ export class WhatsAppButtons implements INodeType {
     const headerImageURL = this.getNodeParameter(
       "headerImageURL",
       0,
-      "",
+      ""
     ) as string;
     let responseData: any;
 
@@ -467,7 +471,7 @@ export class WhatsAppButtons implements INodeType {
     const url =
       proxyUrl !== ""
         ? proxyUrl
-        : `${baseURL}/${whatsappPhoneNumber.id}/messages`;
+        : `${ baseURL }/${ whatsappPhoneNumber.id }/messages`;
     const shouldUseProxyURL = proxyUrl !== "" && proxyUrlToggle;
 
     try {
@@ -483,7 +487,7 @@ export class WhatsAppButtons implements INodeType {
             headerImageURL: string,
             footer: string,
             messageText: string,
-            credentials: ICredentialDataDecryptedObject,
+            credentials: ICredentialDataDecryptedObject
           ) => {
             const templateBuilder = builder
               .setRecipient(phoneNumber)
@@ -494,7 +498,10 @@ export class WhatsAppButtons implements INodeType {
 
             if (shouldUseProxyURL) {
               json = {
-                body: templateBuilder.build(),
+                from: fromPhoneId,
+                to: phoneNumber,
+                type: 'text',
+                messageBody: messageText
               };
             } else {
               json = templateBuilder.build();
@@ -502,9 +509,9 @@ export class WhatsAppButtons implements INodeType {
 
             return axios.post(url, JSON.stringify(json), {
               headers: {
-                Authorization: `Bearer ${credentials.apiKey}`,
-                "Content-Type": "application/json",
-              },
+                Authorization: `Bearer ${ credentials.apiKey }`,
+                "Content-Type": "application/json"
+              }
             });
           };
 
@@ -517,17 +524,17 @@ export class WhatsAppButtons implements INodeType {
               headerImageURL,
               footer,
               message,
-              credentials,
+              credentials
             )
           ).data;
           break;
 
-        case "interactive":
+        case "interactiveButtons":
           message = this.getNodeParameter("message", 0) as string;
           const buttonFields = this.getNodeParameter(
             "plainButton.fieldValues",
             0,
-            "",
+            ""
           ) as ButtonArray;
 
           // Arrow function used to preserve `this` context
@@ -540,7 +547,7 @@ export class WhatsAppButtons implements INodeType {
             headerImageURL: string,
             footer: string,
             queryParameters: ButtonArray,
-            credentials: ICredentialDataDecryptedObject,
+            credentials: ICredentialDataDecryptedObject
           ) => {
             const templateBuilder = builder
               .setRecipient(phoneNumber)
@@ -549,17 +556,28 @@ export class WhatsAppButtons implements INodeType {
                 message,
                 queryParameters.map((parameter, index) => {
                   return {
-                    id: `button_${index.toString()}`,
-                    title: parameter.buttonTitle,
+                    id: `button_${ index.toString() }`,
+                    title: parameter.buttonTitle
                   };
-                }),
-              );
+                })
+              ).addInteractiveFooter(footer)
+              .addInteractiveHeaderImage(headerImageURL);
 
             let json = {};
 
             if (shouldUseProxyURL) {
+              const interactiveButtonData: InteractiveButtonData = {
+                body: {
+                  text: message
+                },
+                buttons: queryParameters
+              }
               json = {
-                body: templateBuilder.build(),
+                from: fromPhoneId,
+                to: phoneNumber,
+                type: 'interactive',
+                messageBody: message,
+                interactiveButtonData: interactiveButtonData
               };
             } else {
               json = templateBuilder.build();
@@ -567,9 +585,9 @@ export class WhatsAppButtons implements INodeType {
 
             return axios.post(url, JSON.stringify(json), {
               headers: {
-                Authorization: `Bearer ${credentials.apiKey}`,
-                "Content-Type": "application/json",
-              },
+                Authorization: `Bearer ${ credentials.apiKey }`,
+                "Content-Type": "application/json"
+              }
             });
           };
 
@@ -583,17 +601,17 @@ export class WhatsAppButtons implements INodeType {
               headerImageURL,
               footer,
               buttonFields,
-              credentials,
+              credentials
             )
           ).data;
           break;
 
-        case "listButtons":
+        case "interactiveList":
           message = this.getNodeParameter("message", 0) as string;
           const buttonFieldsWithDescription = this.getNodeParameter(
             "buttonWithDescription.section",
             0,
-            "",
+            ""
           ) as SectionArray;
           const listTitle = this.getNodeParameter("listTitle", 0) as string;
 
@@ -608,7 +626,7 @@ export class WhatsAppButtons implements INodeType {
             footer: string,
             listTitle: string,
             sections: SectionArray,
-            credentials: ICredentialDataDecryptedObject,
+            credentials: ICredentialDataDecryptedObject
           ) => {
             let sectionsDict: Section[] = [];
 
@@ -616,15 +634,15 @@ export class WhatsAppButtons implements INodeType {
               const buttons: Row[] = section.buttonInSection.buttons.map(
                 (button, index) => {
                   return {
-                    id: `button_${index.toString()}`,
+                    id: `button_${ index.toString() }`,
                     title: button.buttonTitle,
-                    description: button.buttonDescription,
+                    description: button.buttonDescription
                   };
-                },
+                }
               );
               sectionsDict.push({
                 title: section.sectionTitle,
-                rows: buttons,
+                rows: buttons
               });
             });
 
@@ -634,26 +652,45 @@ export class WhatsAppButtons implements INodeType {
               .addInteractiveList(
                 message,
                 listTitle,
-                sectionsDict,
-                headerImageURL === "" ? null : headerImageURL,
-                footer === "" ? null : footer,
-              );
+                sectionsDict
+              ).addInteractiveFooter(footer)
+              .addInteractiveHeaderImage(headerImageURL);
 
             let json = {};
 
             if (shouldUseProxyURL) {
+              const interactiveListData: InteractiveListData = {
+                title: listTitle,
+                body: {
+                  text: message
+                },
+                sections: sections
+              }
+              if (footer !== '') {
+                interactiveListData.footer = footer
+              }
+              if (headerImageURL !== '') {
+                interactiveListData.header = {
+                  type: WhatsAppHeaderComponentType.image,
+                  url: headerImageURL
+                }
+              }
               json = {
-                body: templateBuilder.build(),
-              };
+                from: fromPhoneId,
+                to: phoneNumber,
+                type: 'interactive',
+                messageBody: message,
+                interactiveListData: interactiveListData
+              }
             } else {
               json = templateBuilder.build();
             }
 
             return axios.post(url, JSON.stringify(json), {
               headers: {
-                Authorization: `Bearer ${credentials.apiKey}`,
-                "Content-Type": "application/json",
-              },
+                Authorization: `Bearer ${ credentials.apiKey }`,
+                "Content-Type": "application/json"
+              }
             });
           };
 
@@ -668,24 +705,19 @@ export class WhatsAppButtons implements INodeType {
               footer,
               listTitle,
               buttonFieldsWithDescription,
-              credentials,
+              credentials
             )
           ).data;
 
           break;
 
         case "template":
-          const selectedTemplateNode = this.getNodeParameter(
-            "templates",
-            0,
-          ) as string;
-          const selectedTemplate = JSON.parse(
-            selectedTemplateNode,
-          ) as WhatsAppTemplate;
+          const selectedTemplateNode = this.getNodeParameter("templates", 0) as string;
+          const selectedTemplate = JSON.parse(selectedTemplateNode) as WhatsAppTemplate;
           const parameters = this.getNodeParameter(
             "templateParameterList.parameters",
             0,
-            "",
+            ""
           ) as ParameterArray | undefined;
 
           const handleSendingTemplateRequest = async (
@@ -697,8 +729,9 @@ export class WhatsAppButtons implements INodeType {
             footer: string,
             template: WhatsAppTemplate,
             credentials: ICredentialDataDecryptedObject,
-            parameters?: ParameterArray,
+            parameters?: ParameterArray
           ) => {
+            let templateData: TemplateData = {body: {}};
             const templateBuilder = builder
               .setRecipient(phoneNumber)
               .setSender(fromPhoneId)
@@ -708,7 +741,7 @@ export class WhatsAppButtons implements INodeType {
               templateBuilder.addTemplateBodyParameter();
               parameters.forEach((parameter) => {
                 templateBuilder.addTemplateBodyTextParameter(
-                  parameter.parameterValue,
+                  parameter.parameterValue
                 );
               });
             }
@@ -721,19 +754,43 @@ export class WhatsAppButtons implements INodeType {
             let json = {};
 
             if (shouldUseProxyURL) {
+              let messageBody = template.components.find(component => component.type === WhatsAppComponentType.body)?.text
+
+              if (messageBody && parameters) {
+                templateData.body = {
+                  parameters: parameters.map(param => param.parameterValue)
+                }
+
+                messageBody = parameters.reduce((result, param, index) => {
+                  const placeholder = new RegExp(`{{(${index + 1})}}`, 'g')
+                  return result.replace(placeholder, param.parameterValue)
+                }, messageBody)
+              }
+
+              if (headerAction === "image" && headerImageURL !== "") {
+                templateData.header = {
+                  type: WhatsAppHeaderComponentType.image,
+                  url: headerImageURL
+                }
+              }
+
               json = {
-                body: templateBuilder.build(),
-                templateSchema: template,
-              };
+                from: fromPhoneId,
+                to: phoneNumber,
+                type: 'template',
+                messageBody: messageBody,
+                templateData: templateData,
+                templateInformation: template
+              }
             } else {
               json = templateBuilder.build();
             }
 
             return axios.post(url, JSON.stringify(json), {
               headers: {
-                Authorization: `Bearer ${credentials.apiKey}`,
-                "Content-Type": "application/json",
-              },
+                Authorization: `Bearer ${ credentials.apiKey }`,
+                "Content-Type": "application/json"
+              }
             });
           };
 
@@ -747,17 +804,17 @@ export class WhatsAppButtons implements INodeType {
               footer,
               selectedTemplate,
               credentials,
-              parameters,
+              parameters
             )
           ).data;
           break;
       }
 
-      return this.prepareOutputData([{ json: responseData }]);
+      return this.prepareOutputData([ {json: responseData} ]);
     } catch (error) {
       console.error(
-        `Error making ${action} request to WhatsAppButtons API:`,
-        error.message,
+        `Error making ${ action } request to WhatsAppButtons API:`,
+        error.message
       );
       throw new NodeApiError(this.getNode(), error);
     }

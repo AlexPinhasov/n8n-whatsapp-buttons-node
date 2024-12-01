@@ -1,3 +1,5 @@
+import { ButtonArray, SectionArray } from './WhatsAppButtons.node'
+
 type ReplyButton = {
   id: string;
   title: string;
@@ -53,7 +55,9 @@ type InteractiveButton = {
   };
   action: {
     buttons: Button[];
-  };
+  },
+  footer?: Footer
+  header?: Header
 };
 
 type InteractiveMessage = {
@@ -92,13 +96,66 @@ type WhatsAppMessage = {
   text?: { body: string };
 };
 
+export const enum WhatsAppComponentButtonType {
+  reply = "reply",
+  url = "url",
+  phone_number = "phone_number",
+  quick_reply = 'quick_reply',
+  copy_code = 'copy_code'
+}
+
+export const enum WhatsAppHeaderComponentType {
+  none = 'none',
+  text = 'text',
+  image = 'image',
+  video = 'video',
+  document = 'document',
+  location = 'location',
+}
+
+export interface TemplateData {
+  header?: {
+    type: WhatsAppHeaderComponentType
+    url?: string
+    parameters?: string[]
+  },
+  body: {
+    parameters?: string[]
+  },
+  buttons?: {
+    type: WhatsAppComponentButtonType,
+    text: string
+  }[]
+}
+
+export interface InteractiveButtonData {
+  body: {
+    text: string
+  }
+  buttons?: ButtonArray
+}
+
+export interface InteractiveListData {
+  title: string
+  header?: {
+    type: WhatsAppHeaderComponentType
+    url?: string
+    parameters?: string[]
+  },
+  body: {
+    text: string
+  }
+  footer?: string
+  sections?: SectionArray
+}
+
 export class WhatsAppTemplateBuilder {
   private readonly body: WhatsAppMessage;
 
   constructor() {
     this.body = {
       messaging_product: "whatsapp",
-      components: [],
+      components: []
     };
   }
 
@@ -116,7 +173,7 @@ export class WhatsAppTemplateBuilder {
   setPlainMessage(message: string): WhatsAppTemplateBuilder {
     this.body.type = "text";
     this.body.text = {
-      body: message,
+      body: message
     };
     return this;
   }
@@ -126,9 +183,9 @@ export class WhatsAppTemplateBuilder {
     this.body.template = {
       name: name,
       language: {
-        code: languageCode,
+        code: languageCode
       },
-      components: [],
+      components: []
     };
     return this;
   }
@@ -137,7 +194,7 @@ export class WhatsAppTemplateBuilder {
   addTemplateBodyParameter(): WhatsAppTemplateBuilder {
     this.body.template!.components!.push({
       type: "body",
-      parameters: [],
+      parameters: []
     });
     return this;
   }
@@ -146,9 +203,9 @@ export class WhatsAppTemplateBuilder {
     this.body
       .template!.components!.find((component) => component.type === "body")
       ?.parameters?.push({
-        type: "text",
-        text: text,
-      });
+      type: "text",
+      text: text
+    });
     return this;
   }
 
@@ -156,7 +213,7 @@ export class WhatsAppTemplateBuilder {
   addTemplateHeaderParameter(): WhatsAppTemplateBuilder {
     this.body.template!.components!.push({
       type: "header",
-      parameters: [],
+      parameters: []
     });
     return this;
   }
@@ -165,25 +222,58 @@ export class WhatsAppTemplateBuilder {
     this.body
       .template!.components!.find((component) => component.type === "header")
       ?.parameters?.push({
-        type: "image",
-        image: {
-          link: imageUrl,
-        },
-      });
+      type: "image",
+      image: {
+        link: imageUrl
+      }
+    });
     return this;
   }
 
-  addFooter(text: string): WhatsAppTemplateBuilder {
+  addTemplateFooter(text: string): WhatsAppTemplateBuilder {
     this.body.components!.push({
       type: "footer",
-      text: text,
+      text: text
     });
+    return this;
+  }
+
+  addInteractiveFooter(text: string): WhatsAppTemplateBuilder {
+    if (text === '') {
+      return this
+    }
+
+    this.body.interactive!.footer = {
+      text: text
+    };
+    return this;
+  }
+
+  addInteractiveHeaderText(text: string): WhatsAppTemplateBuilder {
+    this.body.interactive!.header = {
+      type: 'text',
+      text: text
+    };
+    return this;
+  }
+
+  addInteractiveHeaderImage(link: string): WhatsAppTemplateBuilder {
+    if (link === '') {
+      return this
+    }
+
+    this.body.interactive!.header = {
+      type: 'image',
+      image: {
+        link: link
+      }
+    };
     return this;
   }
 
   addButtonPhoneNumber(
     text: string,
-    phoneNumber: string,
+    phoneNumber: string
   ): WhatsAppTemplateBuilder {
     this.body.components!.push({
       type: "buttons",
@@ -192,10 +282,10 @@ export class WhatsAppTemplateBuilder {
           type: "reply",
           reply: {
             id: phoneNumber,
-            title: text,
-          },
-        },
-      ],
+            title: text
+          }
+        }
+      ]
     });
     return this;
   }
@@ -203,14 +293,14 @@ export class WhatsAppTemplateBuilder {
   addButtonURL(
     text: string,
     url: string,
-    exampleValue: string | null = null,
+    exampleValue: string | null = null
   ): WhatsAppTemplateBuilder {
     const button: Button = {
       type: "reply",
       reply: {
         id: url,
-        title: text,
-      },
+        title: text
+      }
     };
 
     if (exampleValue) {
@@ -219,7 +309,7 @@ export class WhatsAppTemplateBuilder {
 
     this.body.components!.push({
       type: "buttons",
-      buttons: [button],
+      buttons: [ button ]
     });
     return this;
   }
@@ -232,10 +322,10 @@ export class WhatsAppTemplateBuilder {
           type: "reply",
           reply: {
             id: text,
-            title: text,
-          },
-        },
-      ],
+            title: text
+          }
+        }
+      ]
     });
     return this;
   }
@@ -243,21 +333,21 @@ export class WhatsAppTemplateBuilder {
   // Interactive - Button
   addInteractiveButton(
     bodyText: string,
-    buttons: ReplyButton[],
+    buttons: ReplyButton[]
   ): WhatsAppTemplateBuilder {
     this.body.type = "interactive";
     this.body.interactive = {
       type: "button",
-      body: { text: bodyText },
+      body: {text: bodyText},
       action: {
         buttons: buttons.map((button) => ({
           type: "reply",
           reply: {
             id: button.id,
-            title: button.title,
-          },
-        })),
-      },
+            title: button.title
+          }
+        }))
+      }
     };
     return this;
   }
@@ -267,14 +357,12 @@ export class WhatsAppTemplateBuilder {
     bodyText: string,
     buttonText: string,
     sections: Section[],
-    headerText: string | null = null,
-    footerText: string | null = null,
   ): WhatsAppTemplateBuilder {
     this.body.type = "interactive";
     this.body.interactive = {
       type: "list",
       body: {
-        text: bodyText,
+        text: bodyText
       },
       action: {
         button: buttonText,
@@ -283,26 +371,11 @@ export class WhatsAppTemplateBuilder {
           rows: section.rows.map((row) => ({
             id: row.id,
             title: row.title,
-            description: row.description,
-          })),
-        })),
-      },
+            description: row.description
+          }))
+        }))
+      }
     };
-
-    // Add text header if headerText is provided
-    if (headerText) {
-      this.body.interactive.header = {
-        type: "text",
-        text: headerText,
-      };
-    }
-
-    // Optionally add footer
-    if (footerText) {
-      this.body.interactive.footer = {
-        text: footerText,
-      };
-    }
 
     return this;
   }

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-whatsapp-buttons",
-  "version": "0.2.0",
+  "version": "1.0.1",
   "description": "Encapsulate WhatsApp Business API for sending messages with actions",
   "keywords": [
     "n8n-community-node-package"
