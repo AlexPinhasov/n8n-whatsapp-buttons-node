@@ -5,9 +5,9 @@ import type {
   INodePropertyOptions,
   INodeType,
   INodeTypeDescription
-} from "n8n-workflow";
-import { IExecuteFunctions, NodeApiError } from "n8n-workflow";
-import axios from "axios";
+} from "n8n-workflow"
+import { IExecuteFunctions, NodeApiError } from "n8n-workflow"
+import axios from "axios"
 import {
   InteractiveButtonData,
   InteractiveListData,
@@ -16,8 +16,83 @@ import {
   TemplateData,
   WhatsAppHeaderComponentType,
   WhatsAppTemplateBuilder
-} from "./WhatsAppTemplateBuilder";
-import { WhatsAppComponentType, WhatsAppTemplate } from "./WhatsAppTemplate";
+} from "./WhatsAppTemplateBuilder"
+import { WhatsAppComponentType, WhatsAppTemplate } from "./WhatsAppTemplate"
+
+async function handleSendingTemplateRequest(
+  builder: WhatsAppTemplateBuilder,
+  url: string,
+  shouldUseProxyURL: boolean,
+  phoneNumber: string,
+  fromPhoneId: string,
+  headerAction: string,
+  headerImageURL: string,
+  footer: string,
+  template: WhatsAppTemplate,
+  credentials: ICredentialDataDecryptedObject,
+  parameters?: ParameterArray) {
+  let templateData: TemplateData = {body: {}}
+  const templateBuilder = builder
+    .setRecipient(phoneNumber)
+    .setSender(fromPhoneId)
+    .setTemplateName(template.name, template.language)
+
+  if (parameters && Array.isArray(parameters)) {
+    templateBuilder.addTemplateBodyParameter()
+    parameters.forEach((parameter) => {
+      templateBuilder.addTemplateBodyTextParameter(
+        parameter.parameterValue
+      )
+    })
+  }
+
+  if (headerAction === "image" && headerImageURL !== "") {
+    templateBuilder.addTemplateHeaderParameter()
+    templateBuilder.addTemplateHeaderImageParameter(headerImageURL)
+  }
+
+  let json = {}
+
+  if (shouldUseProxyURL) {
+    let messageBody = template.components.find(component => component.type === WhatsAppComponentType.body)?.text
+
+    if (messageBody && parameters) {
+      templateData.body = {
+        parameters: parameters.map(param => param.parameterValue)
+      }
+
+      messageBody = parameters.reduce((result, param, index) => {
+        const placeholder = new RegExp(`{{(${index + 1})}}`, 'g')
+        return result.replace(placeholder, param.parameterValue)
+      }, messageBody)
+    }
+
+    if (headerAction === "image" && headerImageURL !== "") {
+      templateData.header = {
+        type: WhatsAppHeaderComponentType.image,
+        url: headerImageURL
+      }
+    }
+
+    json = {
+      from: fromPhoneId,
+      to: phoneNumber,
+      type: 'template',
+      messageBody: messageBody,
+      templateData: templateData,
+      templateInformation: template
+    }
+  } else {
+    json = templateBuilder.build()
+  }
+
+  return axios.post(url, JSON.stringify(json), {
+    headers: {
+      Authorization: `Bearer ${ credentials.apiKey }`,
+      "Content-Type": "application/json"
+    }
+  })
+}
 
 export type ParameterArray = Array<{
   parameterValue: string;
@@ -44,7 +119,7 @@ type WhatsAppPhoneNumber = {
   id: string;
 };
 
-const baseURL = "https://graph.facebook.com/v20.0";
+const baseURL = "https://graph.facebook.com/v20.0"
 
 export class WhatsAppButtons implements INodeType {
   // @ts-ignore
@@ -54,7 +129,7 @@ export class WhatsAppButtons implements INodeType {
     icon: "file:whatsappbuttons.svg",
     group: [ "transform" ],
     version: 1,
-    subtitle: "1.0.1",
+    subtitle: "1.0.2",
     description: "Send Message With Buttons",
     defaults: {
       name: "WhatsApp Buttons"
@@ -74,6 +149,10 @@ export class WhatsAppButtons implements INodeType {
         type: "options",
         options: [
           {
+            name: "Custom Template",
+            value: "customTemplate"
+          },
+          {
             name: "In-Message Buttons",
             value: "interactiveButtons"
           },
@@ -82,12 +161,12 @@ export class WhatsAppButtons implements INodeType {
             value: "interactiveList"
           },
           {
-            name: "Template",
-            value: "template"
-          },
-          {
             name: "Message",
             value: "message"
+          },
+          {
+            name: "Template",
+            value: "template"
           }
         ],
         default: "interactiveButtons"
@@ -160,6 +239,11 @@ export class WhatsAppButtons implements INodeType {
         displayName: "Header Type",
         name: "headerAction",
         type: "options",
+        displayOptions: {
+          show: {
+            action: [ "interactiveButtons", "interactiveList" ]
+          }
+        },
         options: [
           {
             name: "None",
@@ -288,6 +372,18 @@ export class WhatsAppButtons implements INodeType {
         ]
       },
       {
+        displayName: "Template JSON",
+        name: "templateJSONInput",
+        type: "json",
+        default: "",
+        displayOptions: {
+          show: {
+            action: [ "customTemplate" ]
+          }
+        },
+        description: "Raw JSON input for the template parameters"
+      },
+      {
         displayName: "Template Parameter List",
         name: "templateParameterList",
         placeholder: "Add Parameter",
@@ -361,7 +457,7 @@ export class WhatsAppButtons implements INodeType {
         }
       }
     ]
-  };
+  }
 
   methods = {
     loadOptions: {
@@ -370,7 +466,7 @@ export class WhatsAppButtons implements INodeType {
         this: ILoadOptionsFunctions,
       ): Promise<INodePropertyOptions[]> {
         // Fetch credentials needed for API access (if required)
-        const credentials = await this.getCredentials("whatsAppButtonsApi");
+        const credentials = await this.getCredentials("whatsAppButtonsApi")
 
         // Make the API request to get the available phone numbers
         const response = await axios.get(
@@ -381,10 +477,10 @@ export class WhatsAppButtons implements INodeType {
               "Content-Type": "application/json"
             }
           }
-        );
+        )
 
         // Extract phone numbers from the API response
-        const phoneNumbers = response.data.data as WhatsAppPhoneNumber[];
+        const phoneNumbers = response.data.data as WhatsAppPhoneNumber[]
 
         if (phoneNumbers.length === 0) {
           return [
@@ -392,21 +488,21 @@ export class WhatsAppButtons implements INodeType {
               name: "No Phone Numbers Available",
               value: ""
             }
-          ];
+          ]
         }
 
         // Map the phone numbers into a format n8n can display in a dropdown
         return phoneNumbers.map((option) => ({
           name: `${ option.display_phone_number } - ${ option.verified_name }`, // This is the label shown in the dropdown
           value: JSON.stringify(option) // This is the value returned when the user selects an option
-        }));
+        }))
       },
 
       async getTemplates(
         this: ILoadOptionsFunctions,
       ): Promise<INodePropertyOptions[]> {
         // Fetch credentials needed for API access (if required)
-        const credentials = await this.getCredentials("whatsAppButtonsApi");
+        const credentials = await this.getCredentials("whatsAppButtonsApi")
 
         // Make the API request to get the available phone numbers
         const response = await axios.get(
@@ -417,10 +513,10 @@ export class WhatsAppButtons implements INodeType {
               "Content-Type": "application/json"
             }
           }
-        );
+        )
 
         // Extract phone numbers from the API response
-        const templates = response.data.data as WhatsAppTemplate[];
+        const templates = response.data.data as WhatsAppTemplate[]
 
         if (templates.length === 0) {
           return [
@@ -428,56 +524,56 @@ export class WhatsAppButtons implements INodeType {
               name: "No Templates Available",
               value: ""
             }
-          ];
+          ]
         }
 
         // Map the phone numbers into a format n8n can display in a dropdown
         return templates.map((option) => ({
           name: option.name,
           value: JSON.stringify(option)
-        }));
+        }))
       }
     }
-  };
+  }
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const action = this.getNodeParameter("action", 0) as string;
-    const phoneNumber = this.getNodeParameter("phoneNumber", 0) as string;
+    const action = this.getNodeParameter("action", 0) as string
+    const phoneNumber = this.getNodeParameter("phoneNumber", 0) as string
     const whatsappPhoneNumberIdString = this.getNodeParameter(
       "senderPhoneDynamicOption",
       0
-    ) as string;
+    ) as string
     const whatsappPhoneNumber = JSON.parse(
       whatsappPhoneNumberIdString
-    ) as WhatsAppPhoneNumber;
-    const proxyUrl = this.getNodeParameter("proxyUrl", 0, "") as string;
+    ) as WhatsAppPhoneNumber
+    const proxyUrl = this.getNodeParameter("proxyUrl", 0, "") as string
     const proxyUrlToggle = this.getNodeParameter(
       "proxyUrlToggle",
       0,
       false
-    ) as boolean;
-    const credentials = await this.getCredentials("whatsAppButtonsApi");
-    const headerAction = this.getNodeParameter("headerAction", 0) as string;
-    const footer = this.getNodeParameter("footer", 0, "") as string;
+    ) as boolean
+    const credentials = await this.getCredentials("whatsAppButtonsApi")
+    const headerAction = this.getNodeParameter("headerAction", 0, "none") as string
+    const footer = this.getNodeParameter("footer", 0, "") as string
     const headerImageURL = this.getNodeParameter(
       "headerImageURL",
       0,
       ""
-    ) as string;
-    let responseData: any;
+    ) as string
+    let responseData: any
 
-    let message: string = "";
-    const builder = new WhatsAppTemplateBuilder();
+    let message: string = ""
+    const builder = new WhatsAppTemplateBuilder()
     const url =
       proxyUrl !== ""
         ? proxyUrl
-        : `${ baseURL }/${ whatsappPhoneNumber.id }/messages`;
-    const shouldUseProxyURL = proxyUrl !== "" && proxyUrlToggle;
+        : `${ baseURL }/${ whatsappPhoneNumber.id }/messages`
+    const shouldUseProxyURL = proxyUrl !== "" && proxyUrlToggle
 
     try {
       switch (action) {
         case "message":
-          message = this.getNodeParameter("message", 0) as string;
+          message = this.getNodeParameter("message", 0) as string
 
           const handleSendingMessageRequest = async (
             url: string,
@@ -492,9 +588,9 @@ export class WhatsAppButtons implements INodeType {
             const templateBuilder = builder
               .setRecipient(phoneNumber)
               .setSender(fromPhoneId)
-              .setPlainMessage(messageText);
+              .setPlainMessage(messageText)
 
-            let json = {};
+            let json = {}
 
             if (shouldUseProxyURL) {
               json = {
@@ -502,9 +598,9 @@ export class WhatsAppButtons implements INodeType {
                 to: phoneNumber,
                 type: 'text',
                 messageBody: messageText
-              };
+              }
             } else {
-              json = templateBuilder.build();
+              json = templateBuilder.build()
             }
 
             return axios.post(url, JSON.stringify(json), {
@@ -512,8 +608,8 @@ export class WhatsAppButtons implements INodeType {
                 Authorization: `Bearer ${ credentials.apiKey }`,
                 "Content-Type": "application/json"
               }
-            });
-          };
+            })
+          }
 
           responseData = (
             await handleSendingMessageRequest(
@@ -526,16 +622,16 @@ export class WhatsAppButtons implements INodeType {
               message,
               credentials
             )
-          ).data;
-          break;
+          ).data
+          break
 
         case "interactiveButtons":
-          message = this.getNodeParameter("message", 0) as string;
+          message = this.getNodeParameter("message", 0) as string
           const buttonFields = this.getNodeParameter(
             "plainButton.fieldValues",
             0,
             ""
-          ) as ButtonArray;
+          ) as ButtonArray
 
           // Arrow function used to preserve `this` context
           const handleInteractiveButtonsRequest = async (
@@ -558,12 +654,12 @@ export class WhatsAppButtons implements INodeType {
                   return {
                     id: `button_${ index.toString() }`,
                     title: parameter.buttonTitle
-                  };
+                  }
                 })
               ).addInteractiveFooter(footer)
-              .addInteractiveHeaderImage(headerImageURL);
+              .addInteractiveHeaderImage(headerImageURL)
 
-            let json = {};
+            let json = {}
 
             if (shouldUseProxyURL) {
               const interactiveButtonData: InteractiveButtonData = {
@@ -578,9 +674,9 @@ export class WhatsAppButtons implements INodeType {
                 type: 'interactive',
                 messageBody: message,
                 interactiveButtonData: interactiveButtonData
-              };
+              }
             } else {
-              json = templateBuilder.build();
+              json = templateBuilder.build()
             }
 
             return axios.post(url, JSON.stringify(json), {
@@ -588,8 +684,8 @@ export class WhatsAppButtons implements INodeType {
                 Authorization: `Bearer ${ credentials.apiKey }`,
                 "Content-Type": "application/json"
               }
-            });
-          };
+            })
+          }
 
           responseData = (
             await handleInteractiveButtonsRequest(
@@ -603,17 +699,17 @@ export class WhatsAppButtons implements INodeType {
               buttonFields,
               credentials
             )
-          ).data;
-          break;
+          ).data
+          break
 
         case "interactiveList":
-          message = this.getNodeParameter("message", 0) as string;
+          message = this.getNodeParameter("message", 0) as string
           const buttonFieldsWithDescription = this.getNodeParameter(
             "buttonWithDescription.section",
             0,
             ""
-          ) as SectionArray;
-          const listTitle = this.getNodeParameter("listTitle", 0) as string;
+          ) as SectionArray
+          const listTitle = this.getNodeParameter("listTitle", 0) as string
 
           // Arrow function used to preserve `this` context
           const handleListButtonsRequest = async (
@@ -628,7 +724,7 @@ export class WhatsAppButtons implements INodeType {
             sections: SectionArray,
             credentials: ICredentialDataDecryptedObject
           ) => {
-            let sectionsDict: Section[] = [];
+            let sectionsDict: Section[] = []
 
             sections.forEach((section) => {
               const buttons: Row[] = section.buttonInSection.buttons.map(
@@ -637,14 +733,14 @@ export class WhatsAppButtons implements INodeType {
                     id: `button_${ index.toString() }`,
                     title: button.buttonTitle,
                     description: button.buttonDescription
-                  };
+                  }
                 }
-              );
+              )
               sectionsDict.push({
                 title: section.sectionTitle,
                 rows: buttons
-              });
-            });
+              })
+            })
 
             const templateBuilder = builder
               .setRecipient(phoneNumber)
@@ -654,9 +750,9 @@ export class WhatsAppButtons implements INodeType {
                 listTitle,
                 sectionsDict
               ).addInteractiveFooter(footer)
-              .addInteractiveHeaderImage(headerImageURL);
+              .addInteractiveHeaderImage(headerImageURL)
 
-            let json = {};
+            let json = {}
 
             if (shouldUseProxyURL) {
               const interactiveListData: InteractiveListData = {
@@ -683,7 +779,7 @@ export class WhatsAppButtons implements INodeType {
                 interactiveListData: interactiveListData
               }
             } else {
-              json = templateBuilder.build();
+              json = templateBuilder.build()
             }
 
             return axios.post(url, JSON.stringify(json), {
@@ -691,8 +787,8 @@ export class WhatsAppButtons implements INodeType {
                 Authorization: `Bearer ${ credentials.apiKey }`,
                 "Content-Type": "application/json"
               }
-            });
-          };
+            })
+          }
 
           responseData = (
             await handleListButtonsRequest(
@@ -707,96 +803,24 @@ export class WhatsAppButtons implements INodeType {
               buttonFieldsWithDescription,
               credentials
             )
-          ).data;
+          ).data
 
-          break;
+          break
 
         case "template":
-          const selectedTemplateNode = this.getNodeParameter("templates", 0) as string;
-          const selectedTemplate = JSON.parse(selectedTemplateNode) as WhatsAppTemplate;
+          const selectedTemplateNode = this.getNodeParameter("templates", 0) as string
+          const selectedTemplate = JSON.parse(selectedTemplateNode) as WhatsAppTemplate
           const parameters = this.getNodeParameter(
             "templateParameterList.parameters",
             0,
             ""
-          ) as ParameterArray | undefined;
-
-          const handleSendingTemplateRequest = async (
-            url: string,
-            phoneNumber: string,
-            fromPhoneId: string,
-            headerAction: string,
-            headerImageURL: string,
-            footer: string,
-            template: WhatsAppTemplate,
-            credentials: ICredentialDataDecryptedObject,
-            parameters?: ParameterArray
-          ) => {
-            let templateData: TemplateData = {body: {}};
-            const templateBuilder = builder
-              .setRecipient(phoneNumber)
-              .setSender(fromPhoneId)
-              .setTemplateName(template.name, template.language);
-
-            if (parameters && Array.isArray(parameters)) {
-              templateBuilder.addTemplateBodyParameter();
-              parameters.forEach((parameter) => {
-                templateBuilder.addTemplateBodyTextParameter(
-                  parameter.parameterValue
-                );
-              });
-            }
-
-            if (headerAction === "image" && headerImageURL !== "") {
-              templateBuilder.addTemplateHeaderParameter();
-              templateBuilder.addTemplateHeaderImageParameter(headerImageURL);
-            }
-
-            let json = {};
-
-            if (shouldUseProxyURL) {
-              let messageBody = template.components.find(component => component.type === WhatsAppComponentType.body)?.text
-
-              if (messageBody && parameters) {
-                templateData.body = {
-                  parameters: parameters.map(param => param.parameterValue)
-                }
-
-                messageBody = parameters.reduce((result, param, index) => {
-                  const placeholder = new RegExp(`{{(${index + 1})}}`, 'g')
-                  return result.replace(placeholder, param.parameterValue)
-                }, messageBody)
-              }
-
-              if (headerAction === "image" && headerImageURL !== "") {
-                templateData.header = {
-                  type: WhatsAppHeaderComponentType.image,
-                  url: headerImageURL
-                }
-              }
-
-              json = {
-                from: fromPhoneId,
-                to: phoneNumber,
-                type: 'template',
-                messageBody: messageBody,
-                templateData: templateData,
-                templateInformation: template
-              }
-            } else {
-              json = templateBuilder.build();
-            }
-
-            return axios.post(url, JSON.stringify(json), {
-              headers: {
-                Authorization: `Bearer ${ credentials.apiKey }`,
-                "Content-Type": "application/json"
-              }
-            });
-          };
+          ) as ParameterArray | undefined
 
           responseData = (
             await handleSendingTemplateRequest(
+              builder,
               url,
+              shouldUseProxyURL,
               phoneNumber,
               whatsappPhoneNumber.id,
               headerAction,
@@ -806,17 +830,44 @@ export class WhatsAppButtons implements INodeType {
               credentials,
               parameters
             )
-          ).data;
-          break;
+          ).data
+          break
+
+        case "customTemplate": {
+          const templateJSONInput = this.getNodeParameter("templateJSONInput", 0) as string
+          const selectedTemplate = JSON.parse(templateJSONInput) as WhatsAppTemplate
+          const parameters = this.getNodeParameter(
+            "templateParameterList.parameters",
+            0,
+            ""
+          ) as ParameterArray | undefined
+
+          responseData = (
+            await handleSendingTemplateRequest(
+              builder,
+              url,
+              shouldUseProxyURL,
+              phoneNumber,
+              whatsappPhoneNumber.id,
+              headerAction,
+              headerImageURL,
+              footer,
+              selectedTemplate,
+              credentials,
+              parameters
+            )
+          ).data
+          break
+        }
       }
 
-      return this.prepareOutputData([ {json: responseData} ]);
+      return this.prepareOutputData([ {json: responseData} ])
     } catch (error) {
       console.error(
         `Error making ${ action } request to WhatsAppButtons API:`,
         error.message
-      );
-      throw new NodeApiError(this.getNode(), error);
+      )
+      throw new NodeApiError(this.getNode(), error)
     }
   }
 }
